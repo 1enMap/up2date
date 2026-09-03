@@ -37,10 +37,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:apk": "eas build --platform android --profile preview",
-    "build:ios": "eas build --platform ios --profile preview",
-    "build:play": "eas build --platform android --profile production",
-    "update": "eas update --branch preview",
+    "build:apk": "npx eas-cli@latest build --platform android --profile preview",
+    "build:ios": "npx eas-cli@latest build --platform ios --profile preview",
+    "build:play": "npx eas-cli@latest build --platform android --profile production",
+    "update": "npx eas-cli@latest update --branch preview",
     "icons": "node scripts/make-icons.mjs assets/logo-source.png"
   },
   "private": true

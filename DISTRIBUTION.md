@@ -17,8 +17,8 @@ review, no waiting.
 
 ```bash
 # once
-npx eas login
-npx eas init                       # writes expo.extra.eas.projectId into app.json
+npx eas-cli@latest login
+npx eas-cli@latest init                       # writes expo.extra.eas.projectId into app.json
 
 # every release
 # bump expo.version in app.json, then:
@@ -61,18 +61,18 @@ Program at $99/year. With it:
 
 ```bash
 npm run build:ios
-npx eas submit --platform ios --latest
+npx eas-cli@latest submit --platform ios --latest
 ```
 
 TestFlight then takes up to 10,000 testers by email or public link; builds expire after 90 days.
 
-Without it, `npx eas update` + Expo Go is the only way an iPhone user runs this — they install
+Without it, `npx eas-cli@latest update` + Expo Go is the only way an iPhone user runs this — they install
 Expo Go from the App Store and open your link. It works, but it lives inside Expo Go rather
 than appearing as its own app.
 
 ## Google Play, if you get there
 
-$25 once. `npm run build:play` produces the `.aab`, then `npx eas submit --platform android
+$25 once. `npm run build:play` produces the `.aab`, then `npx eas-cli@latest submit --platform android
 --latest`. New personal developer accounts have to run a closed test with a tester group
 before production access opens up — check Play's current policy, it has changed more than once.
 
@@ -94,7 +94,7 @@ anything you publish.
 ## Checklist before you tag
 
 - [ ] `expo.version` bumped in `app.json`
-- [ ] `npx eas init` has written `expo.extra.eas.projectId`
+- [ ] `npx eas-cli@latest init` has written `expo.extra.eas.projectId`
 - [ ] `expo.extra.defaultAiBaseUrl` is `""`
 - [ ] `EXPO_TOKEN` set in repository secrets
 - [ ] Installed the APK on a real phone and gone through first launch as a stranger would:

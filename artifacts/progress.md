@@ -41,7 +41,7 @@ Ordered.
 
 1. Put a key in and walk the article screen end to end — summary, fact check, social read-out,
    follow-up. This retires most of § Unverified and is the cheapest high-value step.
-2. `npx eas init`, then tag a release and let the workflow run. Install the APK on a phone.
+2. `npx eas-cli@latest init`, then tag a release and let the workflow run. Install the APK on a phone.
 3. Walk first launch as a stranger: welcome → key → feed → location → a summary.
 4. Decide Reddit/Bluesky: if they stay blocked on mobile, either drop them from the source
    list or add optional OAuth rather than leaving a permanently failing row.
