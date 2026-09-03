@@ -1,0 +1,93 @@
+name: Release APK
+
+# Tag a version and this attaches an installable APK, plus its checksum, to a
+# GitHub Release. No Play Store, no review, no fee — anyone can download it.
+#
+#   npm version patch          # or edit expo.version in app.json
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Requires one repository secret: EXPO_TOKEN (expo.dev → account → access tokens).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Verify the bundle builds
+        run: npx expo export --platform android --output-dir /tmp/export
+
+      # `--output` only applies to local builds, so a cloud build is waited on and
+      # its artifact pulled from the URL EAS reports.
+      - name: Build the APK
+        run: |
+          eas build --platform android --profile preview --non-interactive --wait --json > build.json
+          url=$(jq -r 'if type == "array" then .[0] else . end | .artifacts.buildUrl // .artifacts.applicationArchiveUrl' build.json)
+          test -n "$url" && test "$url" != "null" || { echo "No artifact URL in:"; cat build.json; exit 1; }
+          echo "Downloading $url"
+          curl -fsSL -o up2date.apk "$url"
+
+      - name: Checksum
+        run: |
+          sha256sum up2date.apk > sha256sum.txt
+          cat sha256sum.txt
+          ls -lh up2date.apk
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Up2Date ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            up2date.apk
+            sha256sum.txt
+          body: |
+            ## Install
+
+            1. Download `up2date.apk` below.
+            2. Open it on your Android phone and allow installs from your browser when asked.
+            3. On first launch, add your own AI key — or skip it and just read the news.
+
+            Verify the download if you like:
+
+            ```bash
+            sha256sum -c sha256sum.txt
+            ```
+
+            ## About the AI features
+
+            Summaries, fact checks and the social read-out run on **your own** provider key,
+            stored in your phone's keychain and sent only to that provider. There is no
+            shared key and no server in between. The news itself needs no key.
+
+            iPhone builds are not distributed here — Apple does not allow installing an app
+            outside the App Store or TestFlight.

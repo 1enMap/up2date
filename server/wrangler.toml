@@ -1,0 +1,14 @@
+name = "up2date-ai-proxy"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Optional: create a KV namespace to enable per-IP rate limiting.
+#   npx wrangler kv namespace create RATE_LIMIT
+# then paste the id below and uncomment.
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "<paste the id wrangler prints>"
+
+# Keys are secrets, never variables:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put GEMINI_API_KEY
