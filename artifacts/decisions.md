@@ -115,3 +115,26 @@ than a merely good one.
 
 **What must not be undone.** Do not raise a limit in `BUDGET` without a reason that survives
 "who pays for this". Do not default `autoSummarize` back to true.
+
+## D-09 · 2026-09-04 · Provenance, not a trust score
+
+**Decision.** `src/data/sources.ts` records checkable attributes about publishers — ownership,
+funding model, wire status, IFCN certification of a named fact-checking unit — each with a
+required `sourceUrl` and a `checkedOn` date. There is no quality score, no bias rating and no
+ranking. `src/lib/corroboration.ts` separately counts how many *independent* newsrooms carry a
+story, collapsing titles that share an owner.
+
+**Why.** A trust score is an opinion wearing a badge, and it cannot answer "how can you be
+sure?". Ownership and certification can be checked by the reader. Every commercial rating set
+(NewsGuard, Media Bias/Fact Check, Ad Fontes, AllSides) is licensed and cannot be bundled or
+derived from, which settles the question anyway.
+
+**What must not be undone.** Do not add a score, a star rating or a colour ranking of
+publishers. Do not ship a signal without a working `sourceUrl`. Do not let a reader's own
+trust mark render like a cited one — personal marks are outlines, labelled "your mark".
+Absence of a mark means "not listed", and the empty state must keep saying so.
+
+**Known limits.** Google caps the sibling cluster at 6, so every corroboration count is a floor
+and the copy says "at least". The syndication threshold (0.8 token overlap) is untuned. The
+registrable-domain helper uses a short suffix list, not the public suffix list; it fails to "no
+badge", which is the safe direction.

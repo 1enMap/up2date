@@ -15,7 +15,9 @@ import {
   View,
 } from 'react-native';
 
+import { CoverageDetail } from '@/components/CoveragePill';
 import { SocialSection } from '@/components/SocialSection';
+import { SourceBadges } from '@/components/SourceBadges';
 import { Stars } from '@/components/Stars';
 import { Button, Card, EmptyState, SectionTitle } from '@/components/ui';
 import {
@@ -214,6 +216,9 @@ export default function ArticleScreen() {
             <Text style={{ color: t.textDim, fontSize: 13, fontWeight: '600' }}>{article.source}</Text>
             <Text style={{ color: t.textFaint, fontSize: 13 }}>· {timeAgo(article.publishedAt)}</Text>
           </View>
+          <View style={{ marginBottom: space(2) }}>
+            <SourceBadges article={article} />
+          </View>
           <Text style={{ color: t.text, fontSize: 24, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5 }}>
             {article.title}
           </Text>
@@ -250,6 +255,8 @@ export default function ArticleScreen() {
             onRun={runSummary}
           />
         )}
+
+        <CoverageDetail article={article} />
 
         {article.related.length ? (
           <View>

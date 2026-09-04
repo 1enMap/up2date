@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { CoveragePill } from '@/components/CoveragePill';
+import { SourceBadges } from '@/components/SourceBadges';
 import { Stars } from '@/components/Stars';
 import type { Article } from '@/lib/rss';
 import { rememberArticle } from '@/state/articles';
@@ -48,6 +50,7 @@ function ArticleCardImpl({ article, index }: { article: Article; index?: number 
           {article.source}
         </Text>
         <Text style={{ color: t.textFaint, fontSize: 12 }}>· {timeAgo(article.publishedAt)}</Text>
+        <SourceBadges article={article} compact />
       </View>
 
       <Text
@@ -64,24 +67,7 @@ function ArticleCardImpl({ article, index }: { article: Article; index?: number 
       </Text>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space(3), gap: space(3) }}>
-        {article.related.length ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: space(1.5),
-              backgroundColor: t.surfaceAlt,
-              paddingHorizontal: space(2.5),
-              paddingVertical: space(1),
-              borderRadius: radius.pill,
-            }}
-          >
-            <Ionicons name="layers-outline" size={12} color={t.textDim} />
-            <Text style={{ color: t.textDim, fontSize: 11, fontWeight: '600' }}>
-              {article.related.length + 1} outlets
-            </Text>
-          </View>
-        ) : null}
+        <CoveragePill article={article} />
         <Stars articleId={article.id} size={13} />
         <View style={{ flex: 1 }} />
         <Pressable

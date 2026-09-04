@@ -26,6 +26,8 @@ type Settings = {
   /** Pull in social posts and the AI social read-out alongside the reporting. */
   socialEnabled: boolean;
   themeMode: ThemeMode;
+  /** Reader's own marks, keyed by host (or `name:<display name>` when unknown). */
+  sourcePrefs: Record<string, 'trusted' | 'muted'>;
   onboarded: boolean;
 };
 
@@ -48,6 +50,7 @@ type State = Settings & {
   cacheFactCheck: (id: string, check: FactCheck) => void;
   cachePulse: (id: string, pulse: SocialPulse) => void;
   rate: (id: string, stars: number) => void;
+  setSourcePref: (key: string, pref: 'trusted' | 'muted' | null) => void;
 };
 
 const DEFAULTS: Settings = {
@@ -63,6 +66,7 @@ const DEFAULTS: Settings = {
   aiBaseUrl: '',
   socialEnabled: true,
   themeMode: 'system',
+  sourcePrefs: {},
   onboarded: false,
 };
 
@@ -111,6 +115,14 @@ export const useStore = create<State>()(
 
       cachePulse: (id, pulse) => set((s) => ({ pulses: trim({ ...s.pulses, [id]: pulse }) })),
 
+      setSourcePref: (key, pref) =>
+        set((s) => {
+          const sourcePrefs = { ...s.sourcePrefs };
+          if (pref) sourcePrefs[key] = pref;
+          else delete sourcePrefs[key];
+          return { sourcePrefs };
+        }),
+
       // Tapping the current rating again clears it.
       rate: (id, stars) =>
         set((s) => {
@@ -122,7 +134,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'up2date-v1',
-      version: 3,
+      version: 4,
       // v1 stored a two-value `aiProvider`; v2 stores a catalogue id.
       migrate: (persisted, from) => {
         const s = persisted as Record<string, unknown>;
@@ -132,10 +144,11 @@ export const useStore = create<State>()(
         }
         // v3 makes summaries manual; existing installs get the cheaper default too.
         if (from < 3) s.autoSummarize = false;
+        if (from < 4) s.sourcePrefs = {};
         return s as never;
       },
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: ({ set: _s, toggleTopic, toggleSaved, isSaved, addSearch, clearSearches, cacheSummary, cacheFactCheck, cachePulse, rate, ...rest }) => rest,
+      partialize: ({ set: _s, toggleTopic, toggleSaved, isSaved, addSearch, clearSearches, cacheSummary, cacheFactCheck, cachePulse, rate, setSourcePref, ...rest }) => rest,
     },
   ),
 );

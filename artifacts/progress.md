@@ -15,6 +15,8 @@ Last updated: 2026-09-04
 | Summary · fact check · follow-up Q&A (manual, budgeted) | 🟡 | Typechecked against both providers' SDK/API shapes; **never run against a live API** |
 | Ratings, sort, filter | ✅ | `lib/articleView.ts`, on Today, Search, Local and Saved |
 | Dark mode | ✅ | System / Light / Dark, persisted |
+| Source provenance + corroboration | ✅ | `src/data/sources.ts` (37 publishers, 10 owner groups), `src/lib/corroboration.ts`. All 27 cited URLs verified to resolve; the *claims* behind them are from research, not per-claim verification |
+| Fact check grounding | ✅ | Providers without search are gated out of web mode and offered a coverage comparison instead; verified per provider |
 | Rate limiting | ✅ | `lib/ai/limiter.ts`. All four behaviours verified in isolation: gap enforcement, burst retry, no-retry on daily cap, fail-fast during cooldown |
 | Bring-your-own-key onboarding | ✅ | `app/welcome.tsx`, key checked with a free model-list call before it is saved |
 | Icons | ✅ | Generated from the logo by `scripts/make-icons.mjs` |

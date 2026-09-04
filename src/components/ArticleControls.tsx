@@ -174,6 +174,12 @@ export function ArticleControls({
             <View style={{ gap: space(3) }}>
               <Toggle label="Saved stories only" value={view.savedOnly} onChange={(v) => patch({ savedOnly: v })} />
               <Toggle label="Rated stories only" value={view.ratedOnly} onChange={(v) => patch({ ratedOnly: v })} />
+              <Toggle label="Hide muted publishers" value={view.hideMuted} onChange={(v) => patch({ hideMuted: v })} />
+              <Toggle
+                label="Only publishers I trust"
+                value={view.trustedOnly}
+                onChange={(v) => patch({ trustedOnly: v })}
+              />
             </View>
 
             {sources.length ? (

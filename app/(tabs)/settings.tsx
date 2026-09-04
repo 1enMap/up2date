@@ -185,6 +185,19 @@ export default function SettingsScreen() {
       </View>
 
       <View>
+        <SectionTitle>Sources</SectionTitle>
+        <Card style={{ padding: 0 }}>
+          <Row
+            icon="ribbon-outline"
+            label="About source marks"
+            value={`${Object.keys(store.sourcePrefs).length || ''}`.trim() || undefined}
+            onPress={() => router.push('/settings/sources')}
+            last
+          />
+        </Card>
+      </View>
+
+      <View>
         <SectionTitle>Storage</SectionTitle>
         <Card style={{ padding: 0 }}>
           <Row icon="bookmark-outline" label="Saved stories" value={String(store.saved.length)} />

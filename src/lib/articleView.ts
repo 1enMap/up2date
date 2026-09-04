@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 
+import { sourceKey } from '@/components/SourceBadges';
 import type { Article } from '@/lib/rss';
 import { useStore } from '@/state/store';
 
@@ -14,6 +15,10 @@ export type ViewState = {
   minRating: number;
   savedOnly: boolean;
   ratedOnly: boolean;
+  /** Hide outlets the reader muted. */
+  hideMuted: boolean;
+  /** Show only outlets the reader marked trusted. */
+  trustedOnly: boolean;
 };
 
 export const DEFAULT_VIEW: ViewState = {
@@ -23,6 +28,8 @@ export const DEFAULT_VIEW: ViewState = {
   minRating: 0,
   savedOnly: false,
   ratedOnly: false,
+  hideMuted: true,
+  trustedOnly: false,
 };
 
 export const SORTS: { key: SortKey; label: string }[] = [
@@ -47,7 +54,8 @@ export function activeFilterCount(view: ViewState) {
     (view.sources.length ? 1 : 0) +
     (view.minRating > 0 ? 1 : 0) +
     (view.savedOnly ? 1 : 0) +
-    (view.ratedOnly ? 1 : 0)
+    (view.ratedOnly ? 1 : 0) +
+    (view.trustedOnly ? 1 : 0)
   );
 }
 
@@ -59,6 +67,7 @@ export function useArticleView(articles: Article[]) {
   const [view, setView] = useState<ViewState>(DEFAULT_VIEW);
   const ratings = useStore((s) => s.ratings);
   const saved = useStore((s) => s.saved);
+  const sourcePrefs = useStore((s) => s.sourcePrefs);
 
   const sources = useMemo(() => {
     const counts = new Map<string, number>();
@@ -72,6 +81,9 @@ export function useArticleView(articles: Article[]) {
     const allowed = new Set(view.sources);
 
     const filtered = articles.filter((a) => {
+      const pref = sourcePrefs[sourceKey(a)];
+      if (view.hideMuted && pref === 'muted') return false;
+      if (view.trustedOnly && pref !== 'trusted') return false;
       if (cutoff !== Infinity && Date.now() - a.publishedAt > cutoff) return false;
       if (allowed.size && !allowed.has(a.source)) return false;
       if (view.savedOnly && !savedIds.has(a.id)) return false;
@@ -101,7 +113,7 @@ export function useArticleView(articles: Article[]) {
         sorted.sort((a, b) => b.publishedAt - a.publishedAt);
     }
     return sorted;
-  }, [articles, view, ratings, saved]);
+  }, [articles, view, ratings, saved, sourcePrefs]);
 
   return { items, view, setView, sources, hidden: articles.length - items.length };
 }
