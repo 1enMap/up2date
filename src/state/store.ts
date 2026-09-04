@@ -134,7 +134,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'up2date-v1',
-      version: 4,
+      version: 5,
       // v1 stored a two-value `aiProvider`; v2 stores a catalogue id.
       migrate: (persisted, from) => {
         const s = persisted as Record<string, unknown>;
@@ -145,6 +145,12 @@ export const useStore = create<State>()(
         // v3 makes summaries manual; existing installs get the cheaper default too.
         if (from < 3) s.autoSummarize = false;
         if (from < 4) s.sourcePrefs = {};
+        // v5 drops the Ollama preset; a stored selection must not dangle.
+        if (from < 5 && s.providerId === 'ollama') {
+          s.providerId = DEFAULT_PROVIDER_ID;
+          s.aiBaseUrl = '';
+          s.aiModel = '';
+        }
         return s as never;
       },
       storage: createJSONStorage(() => AsyncStorage),

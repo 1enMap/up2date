@@ -3,7 +3,7 @@ import { AiNotConfiguredError, type AiConfig, type Call, type CallResult } from 
 
 /**
  * The OpenAI `/chat/completions` shape, which OpenRouter, DeepSeek, GLM, Groq,
- * Mistral, xAI, Together, Ollama and most local runners all speak. One adapter
+ * Mistral, xAI, Together and most self-hosted runners all speak. One adapter
  * covers every one of them; only the base URL and model differ.
  */
 
@@ -30,7 +30,7 @@ function endpoint(config: AiConfig, path: string) {
 
 function headers(config: AiConfig) {
   const h: Record<string, string> = { 'Content-Type': 'application/json' };
-  // Local runners like Ollama accept no key at all.
+  // Self-hosted endpoints often accept no key at all.
   if (config.apiKey) h.Authorization = `Bearer ${config.apiKey}`;
   // OpenRouter attributes traffic with these; harmless everywhere else.
   h['HTTP-Referer'] = 'https://github.com/1enMap/up2date';
@@ -70,11 +70,10 @@ async function post(config: AiConfig, payload: Record<string, unknown>, signal?:
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    // Android blocks plain HTTP unless the build opts in, and a phone's own
-    // localhost is not the machine running Ollama.
+    // Android blocks plain HTTP, and a phone's own localhost is the phone.
     if (/CLEARTEXT|cleartext/i.test(message)) {
       throw new Error(
-        'Android blocked this plain-HTTP request. Use an https endpoint, or a build with cleartext enabled, and point the base URL at the machine\'s LAN address rather than localhost.',
+        'Android blocked this plain-HTTP request. The endpoint must be https.',
       );
     }
     if (/Network request failed|Failed to fetch|ECONNREFUSED/i.test(message)) {
@@ -105,7 +104,7 @@ export async function runOpenAiCompatible(
   const search = liveSearchFor(config, call);
   const json = call.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {};
 
-  // Together, Ollama and some OpenRouter routes reject one extra or the other, so
+  // Together and some OpenRouter routes reject one extra or the other, so
   // drop them one at a time rather than losing the answer entirely.
   const ladder: Record<string, unknown>[] = [
     { ...base, ...json, ...(search ? { search_parameters: search } : {}) },

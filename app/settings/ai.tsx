@@ -84,7 +84,7 @@ export default function AiProviderScreen() {
     if (localhostTrap) {
       setStatus({
         tone: 'bad',
-        text: 'Change localhost to the LAN address of the machine running the server (e.g. http://192.168.1.5:11434/v1). On the phone, localhost is the phone.',
+        text: 'On the phone, localhost is the phone. Use an https address the phone can reach — Android blocks plain HTTP.',
       });
       return;
     }
@@ -240,8 +240,8 @@ export default function AiProviderScreen() {
 
         {localhostTrap ? (
           <Text style={{ color: t.warn, fontSize: 12, lineHeight: 18 }}>
-            This base URL points at the phone itself. Replace localhost with the machine's LAN address, and make
-            sure the server listens on it — for Ollama, start it with OLLAMA_HOST=0.0.0.0.
+            This base URL points at the phone itself. A local server needs an https address the phone can
+            reach — Android blocks plain HTTP, so a LAN address will not work.
           </Text>
         ) : null}
 

@@ -3,7 +3,7 @@
  *
  * Three wire protocols cover everything here: Anthropic's Messages API, Google's
  * generateContent, and the OpenAI `/chat/completions` shape that OpenRouter,
- * DeepSeek, GLM, Groq, Mistral, xAI, Together and every local runner speak. So a
+ * DeepSeek, GLM, Groq, Mistral, xAI and Together speak. So a
  * "provider" is a preset — a base URL, a default model and a key — over one of
  * those three adapters.
  */
@@ -149,21 +149,6 @@ export const PROVIDERS: ProviderPreset[] = [
     search: false,
   },
   {
-    id: 'ollama',
-    label: 'Ollama (local)',
-    kind: 'openai',
-    baseUrl: 'http://localhost:11434/v1',
-    defaultModel: 'llama3.2',
-    keyHint: 'not needed',
-    console: 'ollama.com',
-    consoleUrl: 'https://ollama.com/download',
-    blurb: 'Runs on your own machine. No key, no cost.',
-    search: false,
-    free: true,
-    note: 'localhost means the phone itself, so it will not work — use the LAN address of the machine running Ollama (e.g. http://192.168.1.5:11434/v1), start it with OLLAMA_HOST=0.0.0.0, and keep both on the same Wi-Fi. Android also blocks plain HTTP unless the build allows it.',
-    editableBaseUrl: true,
-  },
-  {
     id: 'custom',
     label: 'Custom (OpenAI-compatible)',
     kind: 'openai',
@@ -174,7 +159,7 @@ export const PROVIDERS: ProviderPreset[] = [
     consoleUrl: '',
     blurb: 'Any endpoint that speaks /chat/completions.',
     search: false,
-    note: 'Enter the base URL up to and including /v1. The app appends /chat/completions and /models.',
+    note: 'Enter the base URL up to and including /v1. The app appends /chat/completions and /models. It must be https — Android blocks plain HTTP, so a local model server needs a tunnel rather than a LAN address.',
     editableBaseUrl: true,
   },
 ];

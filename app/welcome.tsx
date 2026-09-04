@@ -82,7 +82,7 @@ export default function WelcomeScreen() {
               </Text>
               <Text style={{ color: t.textFaint, fontSize: 12, lineHeight: 18, marginTop: space(2) }}>
                 Reading the news needs no key at all. You can skip this — Settings has eight more providers,
-                including DeepSeek, GLM, Groq, a local Ollama, or any OpenAI-compatible endpoint.
+                including DeepSeek, GLM, Groq, Mistral, xAI, or any OpenAI-compatible endpoint.
               </Text>
             </View>
           </View>
