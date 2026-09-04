@@ -8,7 +8,6 @@
  *   icon.png                    1024 full-bleed square (iOS applies its own mask)
  *   android-icon-foreground.png 1024 globe on transparent, inside the safe zone
  *   android-icon-background.png 1024 solid brand background
- *   android-icon-monochrome.png 1024 white silhouette on transparent
  *   splash-icon.png              512 globe on transparent
  *   favicon.png                   64 full-bleed square
  */
@@ -170,17 +169,6 @@ function boxOfVisible(img) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-function silhouette(img) {
-  const out = new PNG({ width: img.width, height: img.height });
-  for (let i = 0; i < out.data.length; i += 4) {
-    out.data[i] = 255;
-    out.data[i + 1] = 255;
-    out.data[i + 2] = 255;
-    out.data[i + 3] = img.data[i + 3];
-  }
-  return out;
-}
-
 /** Centres a transparent-background mark on a square canvas at `scale` of its width. */
 function onCanvas(mark, size, scale, background) {
   const side = Math.round(size * scale);
@@ -234,5 +222,4 @@ write('favicon.png', resize(squared, 64, 64));
 // Android masks the foreground hard; 62% keeps the mark inside the safe zone.
 write('android-icon-foreground.png', onCanvas(mark, 1024, 0.62));
 write('android-icon-background.png', fill(1024, 1024, BRAND_BG));
-write('android-icon-monochrome.png', onCanvas(silhouette(mark), 1024, 0.62));
 write('splash-icon.png', onCanvas(mark, 512, 0.8));

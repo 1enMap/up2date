@@ -2,17 +2,12 @@
   "expo": {
     "name": "Up2Date",
     "slug": "Up2Date",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "up2date",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D1528"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.up2date.app",
@@ -26,8 +21,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#0D1528",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundImage": "./assets/android-icon-background.png"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -50,6 +44,19 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Up2Date uses your location to show news from your city and region."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#0D1528",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0D1528"
+          }
         }
       ]
     ],
