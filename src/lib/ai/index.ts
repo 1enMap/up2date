@@ -2,6 +2,7 @@ import { getLanguage } from '@/data/languages';
 
 import { listAnthropicModels as listAnthropicModelsImpl, runAnthropic } from './anthropic';
 import { listGeminiModels as listGeminiModelsImpl, runGemini } from './gemini';
+import { listOpenAiModels as listOpenAiModelsImpl, runOpenAiCompatible } from './openai';
 import { schedule } from './limiter';
 import type {
   AiConfig,
@@ -17,6 +18,7 @@ import type {
 export * from './types';
 export { listGeminiModels, GEMINI_DEFAULT_MODEL } from './gemini';
 export { listAnthropicModels } from './anthropic';
+export { listOpenAiModels } from './openai';
 export { QuotaError, cooldownRemaining, lastQuotaError, clearCooldown } from './limiter';
 
 /**
@@ -24,16 +26,21 @@ export { QuotaError, cooldownRemaining, lastQuotaError, clearCooldown } from './
  * provider's model-list endpoint, which does not bill and does not spend quota.
  */
 export async function verifyKey(config: AiConfig, signal?: AbortSignal): Promise<string[]> {
-  return config.provider === 'gemini'
-    ? listGeminiModelsImpl(config, signal)
-    : listAnthropicModelsImpl(config, signal);
+  if (config.kind === 'gemini') return listGeminiModelsImpl(config, signal);
+  if (config.kind === 'openai') return listOpenAiModelsImpl(config, signal);
+  return listAnthropicModelsImpl(config, signal);
 }
 
 /** Every provider call goes through the limiter, so free-tier keys are not hammered. */
 function run(config: AiConfig, call: Call, signal?: AbortSignal): Promise<CallResult> {
-  return schedule(() =>
-    config.provider === 'gemini' ? runGemini(config, call, signal) : runAnthropic(config, call, signal),
-  );
+  return schedule(() => {
+    // Only Anthropic and Gemini have a server-side search tool; the rest answer
+    // from what the model already knows, so the request goes out without one.
+    const request = config.kind === 'openai' ? { ...call, search: undefined } : call;
+    if (config.kind === 'gemini') return runGemini(config, request, signal);
+    if (config.kind === 'openai') return runOpenAiCompatible(config, request, signal);
+    return runAnthropic(config, request, signal);
+  });
 }
 
 /** Models are asked for bare JSON, but tolerate fences and leading prose. */

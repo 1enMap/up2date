@@ -1,12 +1,17 @@
-export type Provider = 'anthropic' | 'gemini';
+import type { ProviderKind } from '@/data/providers';
+
+export type { ProviderKind };
+/** @deprecated kept so older imports keep compiling; use ProviderKind. */
+export type Provider = ProviderKind;
 
 export type AiConfig = {
-  provider: Provider;
+  /** Which wire protocol to speak. */
+  kind: ProviderKind;
   /** Provider API key. Fine for personal builds; use `baseUrl` for a shipped app. */
   apiKey?: string;
   /** Optional proxy that injects the key server-side (recommended for distribution). */
   baseUrl?: string;
-  /** Overrides the provider default, e.g. a specific Gemini model id. */
+  /** Model id. Required for the OpenAI-compatible adapter. */
   model?: string;
 };
 

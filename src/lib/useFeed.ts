@@ -24,7 +24,7 @@ export function useFeed(spec: FeedSpec | null): FeedState {
   const languageCode = useStore((s) => s.languageCode);
   const countryCode = useStore((s) => s.countryCode);
   const aiBaseUrl = useStore((s) => s.aiBaseUrl);
-  const aiProvider = useStore((s) => s.aiProvider);
+  const providerId = useStore((s) => s.providerId);
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(!!spec);
@@ -89,7 +89,7 @@ export function useFeed(spec: FeedSpec | null): FeedState {
         setRefreshing(false);
       }
     },
-    [key, languageCode, countryCode, aiBaseUrl, aiProvider, spec],
+    [key, languageCode, countryCode, aiBaseUrl, providerId, spec],
   );
 
   useEffect(() => {

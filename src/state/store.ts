@@ -4,7 +4,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { Article } from '@/lib/rss';
-import type { FactCheck, Provider, SocialPulse, Summary } from '@/lib/ai';
+import { DEFAULT_PROVIDER_ID } from '@/data/providers';
+import type { FactCheck, SocialPulse, Summary } from '@/lib/ai';
 import type { ThemeMode } from '@/theme';
 
 export type Place = { label: string; query: string; city?: string; region?: string; country?: string };
@@ -16,10 +17,11 @@ type Settings = {
   place: Place | null;
   followedTopics: string[];
   autoSummarize: boolean;
-  aiProvider: Provider;
-  /** Model override; empty means the provider default. Mainly for picking a Gemini model. */
+  /** Which entry in the provider catalogue is selected. */
+  providerId: string;
+  /** Model override; empty means the preset's default. */
   aiModel: string;
-  /** Base URL of a proxy that holds the API key; empty means talk to the provider directly. */
+  /** Base URL override; empty means the preset's own. */
   aiBaseUrl: string;
   /** Pull in social posts and the AI social read-out alongside the reporting. */
   socialEnabled: boolean;
@@ -54,7 +56,7 @@ const DEFAULTS: Settings = {
   place: null,
   followedTopics: ['top', 'nation', 'world', 'business', 'technology', 'sports'],
   autoSummarize: true,
-  aiProvider: 'anthropic',
+  providerId: DEFAULT_PROVIDER_ID,
   aiModel: '',
   aiBaseUrl: '',
   socialEnabled: true,
@@ -118,6 +120,16 @@ export const useStore = create<State>()(
     }),
     {
       name: 'up2date-v1',
+      version: 2,
+      // v1 stored a two-value `aiProvider`; v2 stores a catalogue id.
+      migrate: (persisted, from) => {
+        const s = persisted as Record<string, unknown>;
+        if (from < 2) {
+          s.providerId = s.aiProvider === 'gemini' ? 'gemini' : 'anthropic';
+          delete s.aiProvider;
+        }
+        return s as never;
+      },
       storage: createJSONStorage(() => AsyncStorage),
       partialize: ({ set: _s, toggleTopic, toggleSaved, isSaved, addSearch, clearSearches, cacheSummary, cacheFactCheck, cachePulse, rate, ...rest }) => rest,
     },

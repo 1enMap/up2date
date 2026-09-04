@@ -9,10 +9,10 @@ import { UpdatesCard } from '@/components/UpdatesCard';
 import { getCountry } from '@/data/countries';
 import { getLanguage } from '@/data/languages';
 import { TOPICS } from '@/data/topics';
-import { GEMINI_DEFAULT_MODEL, cooldownRemaining, listGeminiModels, type Provider } from '@/lib/ai';
+import { getProvider } from '@/data/providers';
+import { cooldownRemaining } from '@/lib/ai';
 import { appVersion } from '@/lib/updates';
-import { saveApiKey, useApiKey } from '@/state/apiKey';
-import { builtInProxy } from '@/state/useAiConfig';
+import { useApiKey } from '@/state/apiKey';
 import { useStore } from '@/state/store';
 import { radius, space, useTheme, type ThemeMode } from '@/theme';
 
@@ -22,88 +22,21 @@ const THEME_MODES: { key: ThemeMode; label: string; icon: keyof typeof Ionicons.
   { key: 'dark', label: 'Dark', icon: 'moon-outline' },
 ];
 
-/**
- * Free-tier Gemini keys are limited per minute and per day, and the limits differ
- * sharply by model — the lite and flash models are the ones that survive real use.
- */
-const GEMINI_FREE_TIER_ADVICE =
-  'On the free tier, stay on a flash or flash-lite model — pro and preview models have very small daily caps and will stop after a handful of requests. Turning off "Summarise on open" also cuts request count roughly in half.';
-
-const PROVIDERS: { key: Provider; label: string; hint: string; keyHint: string; console: string }[] = [
-  {
-    key: 'anthropic',
-    label: 'Claude',
-    hint: 'claude-opus-5 with web search',
-    keyHint: 'sk-ant-…',
-    console: 'console.anthropic.com',
-  },
-  {
-    key: 'gemini',
-    label: 'Gemini',
-    hint: 'Google AI Studio key, with Google Search grounding',
-    keyHint: 'AIza…',
-    console: 'aistudio.google.com/apikey',
-  },
-];
-
 export default function SettingsScreen() {
   const t = useTheme();
   const router = useRouter();
   const store = useStore();
-  const provider = store.aiProvider;
-  const apiKey = useApiKey(provider);
-  const meta = PROVIDERS.find((p) => p.key === provider)!;
-
-  const [keyDraft, setKeyDraft] = useState('');
-  const [baseUrlDraft, setBaseUrlDraft] = useState(store.aiBaseUrl);
-  const [savedNote, setSavedNote] = useState(false);
-  const [models, setModels] = useState<string[] | null>(null);
+  const preset = getProvider(store.providerId);
+  const apiKey = useApiKey(store.providerId);
   const [cooldown, setCooldown] = useState(cooldownRemaining());
-  const [modelsBusy, setModelsBusy] = useState(false);
-  const [modelsError, setModelsError] = useState<string | null>(null);
 
-  useEffect(() => setBaseUrlDraft(store.aiBaseUrl), [store.aiBaseUrl]);
   // Surface an active rate-limit cooldown while the user is looking at this screen.
   useEffect(() => {
     const timer = setInterval(() => setCooldown(cooldownRemaining()), 1000);
     return () => clearInterval(timer);
   }, []);
-  // Each provider carries its own key and model, so drafts reset on a switch.
-  useEffect(() => {
-    setKeyDraft('');
-    setModels(null);
-    setModelsError(null);
-  }, [provider]);
-
   const language = getLanguage(store.languageCode);
   const country = getCountry(store.countryCode);
-
-  const saveAi = async () => {
-    if (keyDraft.trim()) await saveApiKey(provider, keyDraft.trim());
-    store.set('aiBaseUrl', baseUrlDraft.trim());
-    setKeyDraft('');
-    setSavedNote(true);
-    setTimeout(() => setSavedNote(false), 2000);
-  };
-
-  const loadModels = async () => {
-    setModelsBusy(true);
-    setModelsError(null);
-    try {
-      const key = keyDraft.trim() || apiKey;
-      setModels(
-        await listGeminiModels({
-          provider: 'gemini',
-          apiKey: key ?? undefined,
-          baseUrl: baseUrlDraft.trim() || undefined,
-        }),
-      );
-    } catch (e) {
-      setModelsError(e instanceof Error ? e.message : 'Could not list models.');
-    } finally {
-      setModelsBusy(false);
-    }
-  };
 
   return (
     <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(12), gap: space(6) }}>
@@ -191,165 +124,48 @@ export default function SettingsScreen() {
 
       <View>
         <SectionTitle>AI provider</SectionTitle>
-        <Card>
-          <View style={{ flexDirection: 'row', gap: space(2) }}>
-            {PROVIDERS.map((p) => {
-              const on = p.key === provider;
-              return (
-                <Pressable
-                  key={p.key}
-                  onPress={() => store.set('aiProvider', p.key)}
-                  style={{
-                    flex: 1,
-                    padding: space(3),
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    borderColor: on ? t.accent : t.border,
-                    backgroundColor: on ? t.accentSoft : 'transparent',
-                  }}
-                >
-                  <Text style={{ color: on ? t.accent : t.text, fontSize: 15, fontWeight: '700' }}>{p.label}</Text>
-                  <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(1), lineHeight: 16 }}>{p.hint}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Divider />
-
-          <Text style={{ color: t.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: space(2) }}>
-            {meta.label.toUpperCase()} API KEY {apiKey ? '· SAVED' : ''}
-          </Text>
-          <TextInput
-            value={keyDraft}
-            onChangeText={setKeyDraft}
-            placeholder={apiKey ? '•••••••••••••••••••• (stored in keychain)' : meta.keyHint}
-            placeholderTextColor={t.textFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-            style={input(t)}
+        <Card style={{ padding: 0 }}>
+          <Row
+            icon="sparkles-outline"
+            label="Provider"
+            value={preset.label}
+            onPress={() => router.push('/settings/ai')}
           />
-          <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(2) }}>Get one at {meta.console}</Text>
-
-          {cooldown > 0 ? (
-            <View
-              style={{
-                marginTop: space(3),
-                padding: space(3),
-                borderRadius: radius.sm,
-                backgroundColor: t.surfaceAlt,
-                borderLeftWidth: 3,
-                borderLeftColor: t.warn,
-              }}
-            >
-              <Text style={{ color: t.warn, fontSize: 12, fontWeight: '700' }}>
-                Rate limited — pausing requests for {cooldown}s
-              </Text>
-              <Text style={{ color: t.textDim, fontSize: 12, lineHeight: 18, marginTop: space(1) }}>
-                Requests are queued one at a time and retried automatically. If this keeps happening, switch model
-                or provider below.
-              </Text>
-            </View>
-          ) : null}
-
-          {provider === 'gemini' ? (
-            <View style={{ marginTop: space(4) }}>
-              <Text style={{ color: t.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: space(2) }}>
-                MODEL
-              </Text>
-              <TextInput
-                value={store.aiModel}
-                onChangeText={(v) => store.set('aiModel', v)}
-                placeholder={GEMINI_DEFAULT_MODEL}
-                placeholderTextColor={t.textFaint}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={input(t)}
-              />
-              <Text style={{ color: t.textFaint, fontSize: 11, lineHeight: 17, marginTop: space(2) }}>
-                {GEMINI_FREE_TIER_ADVICE}
-              </Text>
-              <Button
-                label={models ? 'Reload models' : 'Load models from my key'}
-                variant="ghost"
-                icon="list-outline"
-                busy={modelsBusy}
-                onPress={loadModels}
-                style={{ marginTop: space(2) }}
-              />
-              {modelsError ? (
-                <Text style={{ color: t.bad, fontSize: 12, marginTop: space(2) }}>{modelsError}</Text>
-              ) : null}
-              {models ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(2), marginTop: space(3) }}>
-                  {models.map((m) => {
-                    const on = (store.aiModel || GEMINI_DEFAULT_MODEL) === m;
-                    return (
-                      <Pressable
-                        key={m}
-                        onPress={() => store.set('aiModel', m)}
-                        style={{
-                          paddingHorizontal: space(3),
-                          paddingVertical: space(2),
-                          borderRadius: radius.pill,
-                          borderWidth: 1,
-                          borderColor: on ? t.accent : t.border,
-                          backgroundColor: on ? t.accent : t.surface,
-                        }}
-                      >
-                        <Text style={{ color: on ? '#fff' : t.textDim, fontSize: 12, fontWeight: '600' }}>{m}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          <Text style={{ color: t.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginTop: space(4), marginBottom: space(2) }}>
-            PROXY URL (OPTIONAL)
-          </Text>
-          <TextInput
-            value={baseUrlDraft}
-            onChangeText={setBaseUrlDraft}
-            placeholder={builtInProxy() || 'https://your-proxy.example.com'}
-            placeholderTextColor={t.textFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            style={input(t)}
+          <Row
+            icon="cube-outline"
+            label="Model"
+            value={store.aiModel || preset.defaultModel || '—'}
+            onPress={() => router.push('/settings/ai')}
           />
-
-          <View style={{ flexDirection: 'row', gap: space(2), marginTop: space(4), alignItems: 'center' }}>
-            <Button label={savedNote ? 'Saved' : 'Save'} icon={savedNote ? 'checkmark' : 'save-outline'} onPress={saveAi} />
-            {apiKey ? (
-              <Button
-                label="Remove key"
-                variant="danger"
-                onPress={() =>
-                  Alert.alert(`Remove the ${meta.label} key?`, 'AI features will stop working until you add one again.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Remove', style: 'destructive', onPress: () => void saveApiKey(provider, '') },
-                  ])
-                }
-              />
-            ) : null}
-          </View>
-
-          {builtInProxy() && !baseUrlDraft ? (
-            <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(2), lineHeight: 17 }}>
-              This build ships with a proxy, so AI features already work without a key of your own. Add one here
-              to use your own quota instead.
-            </Text>
-          ) : null}
-
-          <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(3), lineHeight: 17 }}>
-            Your key is kept in this phone's keychain and sent only to the provider you pick. It goes to no
-            server of ours — there isn't one. The proxy field is for pointing your own devices at your own
-            proxy; leave it empty otherwise.
-          </Text>
+          <Row
+            icon="key-outline"
+            label="API key"
+            value={apiKey ? 'Saved' : preset.kind === 'openai' && !preset.consoleUrl ? 'Not needed' : 'Not set'}
+            onPress={() => router.push('/settings/ai')}
+            last
+          />
         </Card>
+
+        {cooldown > 0 ? (
+          <View
+            style={{
+              marginTop: space(3),
+              padding: space(3),
+              borderRadius: radius.sm,
+              backgroundColor: t.surfaceAlt,
+              borderLeftWidth: 3,
+              borderLeftColor: t.warn,
+            }}
+          >
+            <Text style={{ color: t.warn, fontSize: 12, fontWeight: '700' }}>
+              Rate limited — pausing requests for {cooldown}s
+            </Text>
+            <Text style={{ color: t.textDim, fontSize: 12, lineHeight: 18, marginTop: space(1) }}>
+              Requests are queued one at a time and retried automatically. If this keeps happening, switch model or
+              provider.
+            </Text>
+          </View>
+        ) : null}
 
         <Card style={{ marginTop: space(3) }}>
           <Toggle

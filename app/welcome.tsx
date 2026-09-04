@@ -6,36 +6,14 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Button, Card } from '@/components/ui';
-import { verifyKey, type Provider } from '@/lib/ai';
+import { getProvider } from '@/data/providers';
+import { verifyKey } from '@/lib/ai';
 import { saveApiKey } from '@/state/apiKey';
 import { useStore } from '@/state/store';
 import { radius, space, useTheme } from '@/theme';
 
-const PROVIDERS: {
-  key: Provider;
-  label: string;
-  blurb: string;
-  console: string;
-  url: string;
-  hint: string;
-}[] = [
-  {
-    key: 'gemini',
-    label: 'Google Gemini',
-    blurb: 'Has a free tier — no card needed.',
-    console: 'aistudio.google.com/apikey',
-    url: 'https://aistudio.google.com/apikey',
-    hint: 'AIza…',
-  },
-  {
-    key: 'anthropic',
-    label: 'Claude',
-    blurb: 'Pay as you go, a few paise per story.',
-    console: 'console.anthropic.com',
-    url: 'https://console.anthropic.com/settings/keys',
-    hint: 'sk-ant-…',
-  },
-];
+// The three worth offering on first run: free, best, and widest choice.
+const FIRST_RUN = ['gemini', 'openrouter', 'anthropic'];
 
 /**
  * First run. The news itself needs nothing, so this screen never blocks — but the
@@ -47,12 +25,12 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const store = useStore();
 
-  const [provider, setProvider] = useState<Provider>('gemini');
+  const [providerId, setProviderId] = useState('gemini');
   const [key, setKey] = useState('');
   const [state, setState] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const meta = PROVIDERS.find((p) => p.key === provider)!;
+  const meta = getProvider(providerId);
 
   const finish = () => {
     store.set('onboarded', true);
@@ -66,9 +44,9 @@ export default function WelcomeScreen() {
     setState('checking');
     setError(null);
     try {
-      await verifyKey({ provider, apiKey: trimmed });
-      await saveApiKey(provider, trimmed);
-      store.set('aiProvider', provider);
+      await verifyKey({ kind: meta.kind, apiKey: trimmed, baseUrl: meta.baseUrl || undefined, model: meta.defaultModel });
+      await saveApiKey(providerId, trimmed);
+      store.set('providerId', providerId);
       setState('ok');
       finish();
     } catch (e) {
@@ -103,19 +81,20 @@ export default function WelcomeScreen() {
                 developer, not a server in between.
               </Text>
               <Text style={{ color: t.textFaint, fontSize: 12, lineHeight: 18, marginTop: space(2) }}>
-                Reading the news needs no key at all. You can skip this and add one later in Settings.
+                Reading the news needs no key at all. You can skip this — Settings has eight more providers,
+                including DeepSeek, GLM, Groq, a local Ollama, or any OpenAI-compatible endpoint.
               </Text>
             </View>
           </View>
         </Card>
 
         <View style={{ gap: space(2) }}>
-          {PROVIDERS.map((p) => {
-            const on = p.key === provider;
+          {FIRST_RUN.map(getProvider).map((p) => {
+            const on = p.id === providerId;
             return (
               <Pressable
-                key={p.key}
-                onPress={() => setProvider(p.key)}
+                key={p.id}
+                onPress={() => setProviderId(p.id)}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -146,7 +125,7 @@ export default function WelcomeScreen() {
             label={`Get a key at ${meta.console}`}
             variant="ghost"
             icon="open-outline"
-            onPress={() => WebBrowser.openBrowserAsync(meta.url)}
+            onPress={() => WebBrowser.openBrowserAsync(meta.consoleUrl)}
           />
 
           <TextInput
@@ -155,7 +134,7 @@ export default function WelcomeScreen() {
               setKey(v);
               setState('idle');
             }}
-            placeholder={`Paste your ${meta.label} key (${meta.hint})`}
+            placeholder={`Paste your ${meta.label} key (${meta.keyHint})`}
             placeholderTextColor={t.textFaint}
             autoCapitalize="none"
             autoCorrect={false}

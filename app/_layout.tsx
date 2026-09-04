@@ -40,6 +40,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="article/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="settings/ai" options={{ title: 'AI provider' }} />
           <Stack.Screen name="picker/language" options={{ title: 'Language', presentation: 'modal' }} />
           <Stack.Screen name="picker/country" options={{ title: 'Region', presentation: 'modal' }} />
         </Stack>
