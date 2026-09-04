@@ -55,7 +55,9 @@ const DEFAULTS: Settings = {
   countryCode: 'IN',
   place: null,
   followedTopics: ['top', 'nation', 'world', 'business', 'technology', 'sports'],
-  autoSummarize: true,
+  // Off by default: one request per article opened is the fastest way to burn a
+  // free tier, and the reader rarely wants a summary of every headline they tap.
+  autoSummarize: false,
   providerId: DEFAULT_PROVIDER_ID,
   aiModel: '',
   aiBaseUrl: '',
@@ -120,7 +122,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'up2date-v1',
-      version: 2,
+      version: 3,
       // v1 stored a two-value `aiProvider`; v2 stores a catalogue id.
       migrate: (persisted, from) => {
         const s = persisted as Record<string, unknown>;
@@ -128,6 +130,8 @@ export const useStore = create<State>()(
           s.providerId = s.aiProvider === 'gemini' ? 'gemini' : 'anthropic';
           delete s.aiProvider;
         }
+        // v3 makes summaries manual; existing installs get the cheaper default too.
+        if (from < 3) s.autoSummarize = false;
         return s as never;
       },
       storage: createJSONStorage(() => AsyncStorage),

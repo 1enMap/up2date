@@ -20,6 +20,7 @@ export { listGeminiModels, GEMINI_DEFAULT_MODEL } from './gemini';
 export { listAnthropicModels } from './anthropic';
 export { listOpenAiModels } from './openai';
 export { QuotaError, cooldownRemaining, lastQuotaError, clearCooldown } from './limiter';
+export { BUDGET };
 
 /**
  * Confirms a key works before the reader leaves the settings screen. Uses each
@@ -62,6 +63,24 @@ function languageInstruction(languageCode: string) {
     : `Write entirely in ${lang.name} (${lang.nativeName}). Use natural, everyday ${lang.name} — not a word-for-word translation. Keep proper nouns and technical terms in their commonly used form.`;
 }
 
+/**
+ * Token budget. Every number here is a cost lever, so they live together and are
+ * deliberately mean — a news summary does not need a 12k-character article or a
+ * 2000-token answer, and the reader pays for both.
+ */
+const BUDGET = {
+  /** Characters of article body sent to the model. ~1k tokens. */
+  body: 4000,
+  /** Sibling headlines included as coverage context. */
+  related: 4,
+  /** Turns of follow-up history replayed. Older turns fall off. */
+  history: 6,
+  maxTokens: { summary: 700, factCheck: 1500, social: 1500, followUp: 700, translate: 1200 },
+  searchUses: { factCheck: 3, social: 4, followUp: 2 },
+  /** Headlines translated per feed load. */
+  translate: 15,
+};
+
 function contextBlock(article: ArticleContext) {
   return [
     `HEADLINE: ${article.title}`,
@@ -69,10 +88,13 @@ function contextBlock(article: ArticleContext) {
     `URL: ${article.url}`,
     article.publishedAt ? `PUBLISHED: ${new Date(article.publishedAt).toISOString()}` : '',
     article.related?.length
-      ? `OTHER OUTLETS COVERING THIS:\n${article.related.map((r) => `- ${r.title} (${r.source})`).join('\n')}`
+      ? `OTHER OUTLETS COVERING THIS:\n${article.related
+          .slice(0, BUDGET.related)
+          .map((r) => `- ${r.title} (${r.source})`)
+          .join('\n')}`
       : '',
     article.body
-      ? `ARTICLE TEXT:\n${article.body}`
+      ? `ARTICLE TEXT:\n${article.body.slice(0, BUDGET.body)}`
       : 'ARTICLE TEXT: (could not be retrieved — reason from the headline and the coverage list, and say so.)',
   ]
     .filter(Boolean)
@@ -88,6 +110,7 @@ Rules:
 - If the article text is missing, say what is known from the headline and coverage list, and keep it short.
 - Neutral register. No editorialising, no hype, no "in a stunning turn of events".
 - Attribute contested claims ("the ministry said", "according to Reuters").
+- Be brief. Every field has a length limit below; treat them as maximums, not targets.
 
 Reply with ONLY a JSON object:
 {"headline": string (<=12 words, plain),
@@ -108,7 +131,7 @@ export async function summarizeArticle(
       system: `${SUMMARY_SYSTEM}\n\n${languageInstruction(languageCode)}`,
       messages: [{ role: 'user', content: contextBlock(article) }],
       effort: 'low',
-      maxTokens: 2000,
+      maxTokens: BUDGET.maxTokens.summary,
     },
     signal,
   );
@@ -165,9 +188,11 @@ export async function factCheckArticle(
         languageCode,
       )} Keep source titles in their original language.`,
       messages: [{ role: 'user', content: contextBlock(article) }],
-      effort: 'high',
-      maxTokens: 4000,
-      search: { maxUses: 6 },
+      // 'medium' rather than 'high': the extra effort roughly triples cost for a
+      // marginal gain on a task that is mostly retrieval.
+      effort: 'medium',
+      maxTokens: BUDGET.maxTokens.factCheck,
+      search: { maxUses: BUDGET.searchUses.factCheck },
     },
     signal,
   );
@@ -236,9 +261,9 @@ export async function socialPulse(
         languageCode,
       )} Keep handles, URLs and hashtags as they are.`,
       messages: [{ role: 'user', content: prompt }],
-      effort: 'high',
-      maxTokens: 4000,
-      search: { domains: SOCIAL_DOMAINS, maxUses: 8 },
+      effort: 'medium',
+      maxTokens: BUDGET.maxTokens.social,
+      search: { domains: SOCIAL_DOMAINS, maxUses: BUDGET.searchUses.social },
     },
     signal,
   );
@@ -268,7 +293,7 @@ const FOLLOW_UP_SYSTEM = `You answer follow-up questions about a news story the 
 
 - Ground answers in the supplied article. When the answer is not in it, say so plainly and answer from general knowledge or a search, labelled as such.
 - Use web search when the question needs facts newer or wider than the article, including what people are saying about it on social platforms.
-- Be direct and brief — a few sentences unless asked for more. No preamble, no restating the question.
+- Be direct and brief — three sentences at most unless explicitly asked for more. No preamble, no restating the question, no summary of what you just said.
 - Do not take political sides. Where a question is contested, lay out the positions.`;
 
 export async function askFollowUp(
@@ -282,10 +307,11 @@ export async function askFollowUp(
     config,
     {
       system: `${FOLLOW_UP_SYSTEM}\n\n${languageInstruction(languageCode)}\n\nTHE ARTICLE:\n${contextBlock(article)}`,
-      messages: history,
-      effort: 'medium',
-      maxTokens: 2000,
-      search: { maxUses: 4 },
+      // Only the recent turns are replayed; the article is in the system prompt.
+      messages: history.slice(-BUDGET.history),
+      effort: 'low',
+      maxTokens: BUDGET.maxTokens.followUp,
+      search: { maxUses: BUDGET.searchUses.followUp },
     },
     signal,
   );
@@ -313,7 +339,7 @@ export async function translateHeadlines(
       )} Keep names, places and organisations recognisable. Reply with ONLY a JSON array of strings, same length and order as the input.`,
       messages: [{ role: 'user', content: JSON.stringify(headlines) }],
       effort: 'low',
-      maxTokens: 4000,
+      maxTokens: BUDGET.maxTokens.translate,
     },
     signal,
   );

@@ -31,6 +31,7 @@ import {
   type Summary,
 } from '@/lib/ai';
 import { fetchPageContent, type PageContent } from '@/lib/extract';
+import { useKeyboardHeight } from '@/lib/useKeyboard';
 import { socialQueryFor } from '@/lib/social';
 import { recallArticle } from '@/state/articles';
 import { useStore } from '@/state/store';
@@ -70,6 +71,8 @@ export default function ArticleScreen() {
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const abort = useRef(new AbortController());
+  const scroller = useRef<ScrollView>(null);
+  const keyboard = useKeyboardHeight();
 
   const context: ArticleContext | null = article
     ? {
@@ -142,6 +145,7 @@ export default function ArticleScreen() {
     try {
       const answer = await askFollowUp(aiConfig, context, history, languageCode);
       setChat([...history, { role: 'assistant', content: answer }]);
+      setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 120);
     } catch (e) {
       setChat([...history, { role: 'assistant', content: describe(e) }]);
     } finally {
@@ -172,7 +176,16 @@ export default function ArticleScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(10), gap: space(4) }}>
+      <ScrollView
+        ref={scroller}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          padding: space(4),
+          // Clear the keyboard so the input and the last answer stay visible.
+          paddingBottom: space(10) + (Platform.OS === 'android' ? keyboard : 0),
+          gap: space(4),
+        }}
+      >
         {page?.imageUrl ? (
           <Image
             source={{ uri: page.imageUrl }}
@@ -336,6 +349,7 @@ export default function ArticleScreen() {
                 value={question}
                 onChangeText={setQuestion}
                 onSubmitEditing={() => void ask()}
+                onFocus={() => setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 250)}
                 placeholder="Ask a follow-up…"
                 placeholderTextColor={t.textFaint}
                 style={{ flex: 1, color: t.text, fontSize: 14, paddingVertical: space(3) }}

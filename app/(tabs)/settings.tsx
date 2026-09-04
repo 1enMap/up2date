@@ -170,7 +170,7 @@ export default function SettingsScreen() {
         <Card style={{ marginTop: space(3) }}>
           <Toggle
             title="Summarise on open"
-            body="Generate the summary as soon as you open a story. Turn off to save API spend."
+            body="Off by default. Leaving it off means one request per summary you actually ask for, instead of one per story you tap."
             value={store.autoSummarize}
             onChange={(v) => store.set('autoSummarize', v)}
           />

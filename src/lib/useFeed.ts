@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getLanguage } from '@/data/languages';
-import { translateHeadlines } from '@/lib/ai';
+import { BUDGET, translateHeadlines } from '@/lib/ai';
 import { editionFor, loadFeed, type FeedSpec } from '@/lib/news';
 import type { Article } from '@/lib/rss';
 import { useStore } from '@/state/store';
@@ -66,7 +66,7 @@ export function useFeed(spec: FeedSpec | null): FeedState {
         if (language.aiTranslateOnly && items.length && ai.ready) {
           setTranslating(true);
           try {
-            const slice = items.slice(0, 25);
+            const slice = items.slice(0, BUDGET.translate);
             const translated = await translateHeadlines(
               ai.config,
               slice.map((a) => a.title),

@@ -96,3 +96,22 @@ scores or personalises on their behalf, and there are no ads.
 
 **Why.** It is the product claim. An engagement signal is the kind of thing that arrives as a
 "small improvement" and changes what the app is.
+
+## D-08 · 2026-09-04 · Summaries are manual, and every call runs on a token budget
+
+**Decision.** `autoSummarize` defaults to false, and existing installs are migrated to
+false. `BUDGET` in `lib/ai/index.ts` caps article body at 4000 characters, coverage context
+at 4 headlines, replayed chat history at 6 turns, translation at 15 headlines per feed load,
+and output at 700-1500 tokens per call. Fact check and social lookup run at `medium` effort,
+not `high`.
+
+**Why.** Auto-summarising on open spends one request per story tapped, which exhausted a
+free-tier Gemini key in a handful of articles. Output tokens dominate cost, and a news
+summary does not improve past a few hundred of them.
+
+**Consequences.** Fact checks are slightly shallower than at `high` effort with 6 searches.
+That is the intended trade: the reader pays for this, and an unaffordable feature is worse
+than a merely good one.
+
+**What must not be undone.** Do not raise a limit in `BUDGET` without a reason that survives
+"who pays for this". Do not default `autoSummarize` back to true.

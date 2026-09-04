@@ -12,7 +12,7 @@ Last updated: 2026-09-04
 | 23 languages | 🟡 | Nine native editions verified. Thirteen depend on AI translation (D-03) and are unverified end to end |
 | Social — Reddit, Bluesky, HN, Mastodon, Lemmy | 🟡 | Code verified. HN, Mastodon and Lemmy return data; Reddit and Bluesky return 403 to unauthenticated clients from the dev machine's IP and may behave differently on a phone |
 | Social — X, Instagram, Threads, YouTube | 🟡 | Via AI web search (D-05). Unverified — no key available here |
-| Summary · fact check · follow-up Q&A | 🟡 | Typechecked against both providers' SDK/API shapes; **never run against a live API** |
+| Summary · fact check · follow-up Q&A (manual, budgeted) | 🟡 | Typechecked against both providers' SDK/API shapes; **never run against a live API** |
 | Ratings, sort, filter | ✅ | `lib/articleView.ts`, on Today, Search, Local and Saved |
 | Dark mode | ✅ | System / Light / Dark, persisted |
 | Rate limiting | ✅ | `lib/ai/limiter.ts`. All four behaviours verified in isolation: gap enforcement, burst retry, no-retry on daily cap, fail-fast during cooldown |
