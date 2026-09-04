@@ -12,6 +12,8 @@ export type Language = {
   hl: string;
   /** true when Google News has no edition in this language and we translate instead */
   aiTranslateOnly?: boolean;
+  /** Non-Latin scripts cost noticeably more output tokens for the same content. */
+  script?: 'latin' | 'non-latin';
 };
 
 export const ENGLISH: Language = {
@@ -19,31 +21,32 @@ export const ENGLISH: Language = {
   name: 'English',
   nativeName: 'English',
   hl: 'en-IN',
+  script: 'latin',
 };
 
 export const INDIAN_LANGUAGES: Language[] = [
-  { code: 'as', name: 'Assamese', nativeName: 'অসমীয়া', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', hl: 'bn' },
-  { code: 'brx', name: 'Bodo', nativeName: 'बड़ो', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'doi', name: 'Dogri', nativeName: 'डोगरी', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', hl: 'gu' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', hl: 'hi' },
-  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', hl: 'kn' },
-  { code: 'ks', name: 'Kashmiri', nativeName: 'کٲشُر', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'kok', name: 'Konkani', nativeName: 'कोंकणी', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'mai', name: 'Maithili', nativeName: 'मैथिली', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', hl: 'ml' },
-  { code: 'mni', name: 'Manipuri', nativeName: 'ꯃꯤꯇꯩꯂꯣꯟ', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'mr', name: 'Marathi', nativeName: 'मराठी', hl: 'mr' },
-  { code: 'ne', name: 'Nepali', nativeName: 'नेपाली', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'or', name: 'Odia', nativeName: 'ଓଡ଼ିଆ', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'sa', name: 'Sanskrit', nativeName: 'संस्कृतम्', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'sat', name: 'Santali', nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'sd', name: 'Sindhi', nativeName: 'سنڌي', hl: 'en-IN', aiTranslateOnly: true },
-  { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', hl: 'ta' },
-  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', hl: 'te' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', hl: 'ur' },
+  { code: 'as', name: 'Assamese', nativeName: 'অসমীয়া', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', hl: 'bn', script: 'non-latin' },
+  { code: 'brx', name: 'Bodo', nativeName: 'बड़ो', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'doi', name: 'Dogri', nativeName: 'डोगरी', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', hl: 'gu', script: 'non-latin' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', hl: 'hi', script: 'non-latin' },
+  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', hl: 'kn', script: 'non-latin' },
+  { code: 'ks', name: 'Kashmiri', nativeName: 'کٲشُر', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'kok', name: 'Konkani', nativeName: 'कोंकणी', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'mai', name: 'Maithili', nativeName: 'मैथिली', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', hl: 'ml', script: 'non-latin' },
+  { code: 'mni', name: 'Manipuri', nativeName: 'ꯃꯤꯇꯩꯂꯣꯟ', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'mr', name: 'Marathi', nativeName: 'मराठी', hl: 'mr', script: 'non-latin' },
+  { code: 'ne', name: 'Nepali', nativeName: 'नेपाली', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'or', name: 'Odia', nativeName: 'ଓଡ଼ିଆ', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'sa', name: 'Sanskrit', nativeName: 'संस्कृतम्', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'sat', name: 'Santali', nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'sd', name: 'Sindhi', nativeName: 'سنڌي', hl: 'en-IN', aiTranslateOnly: true, script: 'non-latin' },
+  { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', hl: 'ta', script: 'non-latin' },
+  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', hl: 'te', script: 'non-latin' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', hl: 'ur', script: 'non-latin' },
 ];
 
 export const ALL_LANGUAGES: Language[] = [ENGLISH, ...INDIAN_LANGUAGES];

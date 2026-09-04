@@ -20,18 +20,23 @@ import { Stars } from '@/components/Stars';
 import { Button, Card, EmptyState, SectionTitle } from '@/components/ui';
 import {
   AiNotConfiguredError,
+  FactCheckParseError,
   QuotaError,
+  SearchUnavailableError,
   askFollowUp,
+  capabilitiesFor,
   cooldownRemaining,
   factCheckArticle,
   summarizeArticle,
   type ArticleContext,
   type ChatTurn,
+  type Capabilities,
   type FactCheck,
   type Summary,
 } from '@/lib/ai';
 import { fetchPageContent, type PageContent } from '@/lib/extract';
 import { useKeyboardHeight } from '@/lib/useKeyboard';
+import { verdictDisplay } from '@/lib/factCheckDisplay';
 import { socialQueryFor } from '@/lib/social';
 import { recallArticle } from '@/state/articles';
 import { useStore } from '@/state/store';
@@ -66,7 +71,7 @@ export default function ArticleScreen() {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [factCheck, setFactCheck] = useState<FactCheck | undefined>(cachedFactCheck);
   const [factState, setFactState] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [factError, setFactError] = useState<string | null>(null);
+  const [factError, setFactError] = useState<{ message: string; raw?: string } | null>(null);
   const [chat, setChat] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
@@ -120,17 +125,23 @@ export default function ArticleScreen() {
     }
   }, [autoSummarize, aiReady, page, summary, summaryState, runSummary]);
 
-  const runFactCheck = async () => {
+  const factCaps = capabilitiesFor(aiConfig);
+
+  const runFactCheck = async (mode: 'web' | 'coverage' = 'web') => {
     if (!context) return;
     setFactState('loading');
     setFactError(null);
     try {
-      const result = await factCheckArticle(aiConfig, context, languageCode);
+      const result = await factCheckArticle(aiConfig, context, languageCode, { mode });
       setFactCheck(result);
       if (article) cacheFactCheck(article.id, result);
       setFactState('idle');
     } catch (e) {
-      setFactError(describe(e));
+      // The raw reply is far more useful than a mystery verdict when parsing fails.
+      setFactError({
+        message: describe(e),
+        raw: e instanceof FactCheckParseError ? e.raw : undefined,
+      });
       setFactState('error');
     }
   };
@@ -266,7 +277,14 @@ export default function ArticleScreen() {
         ) : null}
 
         {aiReady ? (
-          <FactCheckSection check={factCheck} state={factState} error={factError} onRun={runFactCheck} />
+          <FactCheckSection
+            check={factCheck}
+            state={factState}
+            error={factError}
+            capabilities={factCaps}
+            onRun={runFactCheck}
+            onConfigure={() => router.push('/settings/ai')}
+          />
         ) : null}
 
         {socialEnabled && context ? (
@@ -466,26 +484,20 @@ function FactCheckSection({
   check,
   state,
   error,
+  capabilities,
   onRun,
+  onConfigure,
 }: {
   check?: FactCheck;
   state: 'idle' | 'loading' | 'error';
-  error: string | null;
-  onRun: () => void;
+  error: { message: string; raw?: string } | null;
+  capabilities: Capabilities;
+  onRun: (mode?: 'web' | 'coverage') => void;
+  onConfigure: () => void;
 }) {
   const t = useTheme();
-  const colors: Record<FactCheck['verdict'], string> = {
-    supported: t.good,
-    mixed: t.warn,
-    unsupported: t.bad,
-    unverifiable: t.textFaint,
-  };
-  const labels: Record<FactCheck['verdict'], string> = {
-    supported: 'Corroborated',
-    mixed: 'Partly corroborated',
-    unsupported: 'Not corroborated',
-    unverifiable: 'Could not verify',
-  };
+  const [showRaw, setShowRaw] = useState(false);
+  const display = check ? verdictDisplay(check, t) : null;
 
   return (
     <View>
@@ -494,15 +506,64 @@ function FactCheckSection({
         {state === 'loading' ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
             <ActivityIndicator size="small" color={t.accent} />
-            <Text style={{ color: t.textDim, fontSize: 14 }}>Searching independent sources…</Text>
+            <Text style={{ color: t.textDim, fontSize: 14 }}>
+              {capabilities.search ? 'Searching independent sources…' : 'Comparing against other coverage…'}
+            </Text>
           </View>
         ) : !check ? (
           <>
             <Text style={{ color: t.textDim, fontSize: 13, lineHeight: 20 }}>
-              Pull out the load-bearing claims and check them against other reporting on the open web.
+              {capabilities.search
+                ? 'Pull out the load-bearing claims and check them against other reporting on the open web.'
+                : capabilities.searchReason}
             </Text>
-            {error ? <Text style={{ color: t.bad, fontSize: 13, marginTop: space(2) }}>{error}</Text> : null}
-            <Button label="Check this story" icon="shield-checkmark-outline" onPress={onRun} style={{ marginTop: space(3) }} />
+
+            {error ? (
+              <>
+                <Text style={{ color: t.bad, fontSize: 13, lineHeight: 19, marginTop: space(2) }}>{error.message}</Text>
+                {error.raw ? (
+                  <Pressable onPress={() => setShowRaw((v) => !v)} hitSlop={8} style={{ marginTop: space(2) }}>
+                    <Text style={{ color: t.accent, fontSize: 12, fontWeight: '600' }}>
+                      {showRaw ? 'Hide' : 'Show'} what the model actually said
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {showRaw && error.raw ? (
+                  <Text
+                    style={{
+                      color: t.textDim,
+                      fontSize: 11,
+                      lineHeight: 16,
+                      marginTop: space(2),
+                      padding: space(3),
+                      backgroundColor: t.surfaceAlt,
+                      borderRadius: radius.sm,
+                    }}
+                  >
+                    {error.raw.slice(0, 1200)}
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+
+            {capabilities.search ? (
+              <Button
+                label="Check this story"
+                icon="shield-checkmark-outline"
+                onPress={() => onRun('web')}
+                style={{ marginTop: space(3) }}
+              />
+            ) : (
+              <View style={{ gap: space(2), marginTop: space(3) }}>
+                <Button label="Use a provider that can search" icon="swap-horizontal-outline" onPress={onConfigure} />
+                <Button
+                  label="Compare against other coverage"
+                  variant="ghost"
+                  icon="layers-outline"
+                  onPress={() => onRun('coverage')}
+                />
+              </View>
+            )}
           </>
         ) : (
           <>
@@ -516,11 +577,12 @@ function FactCheckSection({
                   paddingHorizontal: space(3),
                   paddingVertical: space(1.5),
                   borderRadius: radius.pill,
+                  flexShrink: 1,
                 }}
               >
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors[check.verdict] }} />
-                <Text style={{ color: colors[check.verdict], fontSize: 13, fontWeight: '700' }}>
-                  {labels[check.verdict]}
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: display!.color }} />
+                <Text style={{ color: display!.color, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>
+                  {display!.label}
                 </Text>
               </View>
               <Text style={{ color: t.textFaint, fontSize: 12 }}>{check.confidence} confidence</Text>
@@ -532,7 +594,12 @@ function FactCheckSection({
               <View key={i} style={{ marginTop: space(3.5), paddingLeft: space(3), borderLeftWidth: 2, borderLeftColor: t.border }}>
                 <Text style={{ color: t.text, fontSize: 13, fontWeight: '600', lineHeight: 19 }}>{c.claim}</Text>
                 <Text style={{ color: t.textDim, fontSize: 12, lineHeight: 18, marginTop: space(1) }}>
-                  <Text style={{ color: c.assessment === 'supported' ? t.good : c.assessment === 'disputed' ? t.bad : t.warn, fontWeight: '700' }}>
+                  <Text
+                    style={{
+                      color: c.assessment === 'supported' ? t.good : c.assessment === 'disputed' ? t.bad : t.warn,
+                      fontWeight: '700',
+                    }}
+                  >
                     {c.assessment}
                   </Text>
                   {' — '}
@@ -556,7 +623,32 @@ function FactCheckSection({
               </View>
             ) : null}
 
-            <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(4), lineHeight: 17 }}>
+            {display!.caveat ? (
+              <View
+                style={{
+                  marginTop: space(4),
+                  padding: space(3),
+                  borderRadius: radius.sm,
+                  backgroundColor: t.surfaceAlt,
+                  borderLeftWidth: 3,
+                  borderLeftColor: t.warn,
+                }}
+              >
+                <Text style={{ color: t.textDim, fontSize: 12, lineHeight: 18 }}>{display!.caveat}</Text>
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', gap: space(2), marginTop: space(3) }}>
+              <Button
+                label="Run again"
+                variant="ghost"
+                icon="refresh-outline"
+                onPress={() => onRun(check.grounding === 'coverage' ? 'coverage' : 'web')}
+                style={{ flex: 1 }}
+              />
+            </View>
+
+            <Text style={{ color: t.textFaint, fontSize: 11, marginTop: space(3), lineHeight: 17 }}>
               An automated check, not a verdict. Read the sources before relying on it.
             </Text>
           </>
@@ -596,6 +688,8 @@ function IconButton({
 }
 
 function describe(error: unknown) {
+  if (error instanceof SearchUnavailableError) return error.reason;
+  if (error instanceof FactCheckParseError) return error.message;
   if (error instanceof QuotaError) {
     return `${error.message}${error.daily ? ' Switch model or provider in Settings to keep going.' : ''}`;
   }

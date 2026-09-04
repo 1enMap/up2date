@@ -74,20 +74,34 @@ export async function runGemini(config: AiConfig, call: Call, signal?: AbortSign
     ? `${call.system}\n\nWhen you search, concentrate on these domains: ${call.search.domains.join(', ')}.`
     : call.system;
 
-  const res = await fetch(endpoint(config, `/models/${encodeURIComponent(model)}:generateContent`), {
-    method: 'POST',
-    signal,
-    headers: headers(config),
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: call.messages.map((t) => ({
-        role: t.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: t.content }],
-      })),
-      ...(call.search ? { tools: [{ google_search: {} }] } : {}),
-      generationConfig: { maxOutputTokens: call.maxTokens, temperature: 0.3 },
-    }),
-  });
+  const contents = call.messages.map((t) => ({
+    role: t.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: t.content }],
+  }));
+
+  // A response schema is rejected alongside the search tool, so JSON mode is only
+  // requested when not searching — and even then a 400 retries without it.
+  const wantsJson = call.responseFormat === 'json' && !call.search;
+
+  const send = (json: boolean) =>
+    fetch(endpoint(config, `/models/${encodeURIComponent(model)}:generateContent`), {
+      method: 'POST',
+      signal,
+      headers: headers(config),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+        ...(call.search ? { tools: [{ google_search: {} }] } : {}),
+        generationConfig: {
+          maxOutputTokens: call.maxTokens,
+          temperature: 0.3,
+          ...(json ? { responseMimeType: 'application/json' } : {}),
+        },
+      }),
+    });
+
+  let res = await send(wantsJson);
+  if (!res.ok && wantsJson && res.status === 400) res = await send(false);
 
   const body = (await res.json().catch(() => ({}))) as GeminiResponse;
   if (res.status === 429 || body.error?.status === 'RESOURCE_EXHAUSTED') throw quotaErrorFrom(body, model);
@@ -110,7 +124,7 @@ export async function runGemini(config: AiConfig, call: Call, signal?: AbortSign
     .map((c) => ({ title: c.web?.title ?? c.web?.uri ?? '', url: c.web?.uri ?? '' }))
     .filter((s) => s.url);
 
-  return { text, sources };
+  return { text, sources, truncated: candidate.finishReason === 'MAX_TOKENS' };
 }
 
 /** Lists the models this key can actually use, so Settings never guesses an id. */

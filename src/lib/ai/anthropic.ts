@@ -74,5 +74,5 @@ export async function runAnthropic(config: AiConfig, call: Call, signal?: AbortS
     }
   }
 
-  return { text, sources };
+  return { text, sources, truncated: res.stop_reason === 'max_tokens' };
 }

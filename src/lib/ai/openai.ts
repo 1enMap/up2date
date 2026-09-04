@@ -103,12 +103,20 @@ export async function runOpenAiCompatible(
   };
 
   const search = liveSearchFor(config, call);
-  let res = await post(config, search ? { ...base, search_parameters: search } : base, signal);
+  const json = call.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {};
 
-  // A provider that does not know `search_parameters` rejects the whole request;
-  // losing search beats losing the answer.
-  if (!res.ok && search && (res.status === 400 || res.status === 422)) {
-    res = await post(config, base, signal);
+  // Together, Ollama and some OpenRouter routes reject one extra or the other, so
+  // drop them one at a time rather than losing the answer entirely.
+  const ladder: Record<string, unknown>[] = [
+    { ...base, ...json, ...(search ? { search_parameters: search } : {}) },
+    { ...base, ...(search ? { search_parameters: search } : {}) },
+    { ...base, ...json },
+    base,
+  ];
+
+  let res = await post(config, ladder[0], signal);
+  for (let i = 1; i < ladder.length && !res.ok && (res.status === 400 || res.status === 422); i++) {
+    res = await post(config, ladder[i], signal);
   }
 
   const body = (await res.json().catch(() => ({}))) as ChatResponse;
@@ -139,7 +147,7 @@ export async function runOpenAiCompatible(
   }
 
   const sources = (body.citations ?? []).map((url) => ({ title: url, url }));
-  return { text, sources };
+  return { text, sources, truncated: choice?.finish_reason === 'length' };
 }
 
 /** `GET /models` — used to check a key and to populate the model picker. */

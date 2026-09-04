@@ -1,9 +1,17 @@
 import { getLanguage } from '@/data/languages';
+import { getProvider } from '@/data/providers';
 
 import { listAnthropicModels as listAnthropicModelsImpl, runAnthropic } from './anthropic';
 import { listGeminiModels as listGeminiModelsImpl, runGemini } from './gemini';
 import { listOpenAiModels as listOpenAiModelsImpl, runOpenAiCompatible } from './openai';
+import { capabilitiesFor } from './capabilities';
+import { parseJson, parseJsonLoose } from './json';
+import { coerceFactCheck } from './schema';
 import { schedule } from './limiter';
+import {
+  FactCheckParseError,
+  SearchUnavailableError,
+} from './types';
 import type {
   AiConfig,
   ArticleContext,
@@ -20,6 +28,7 @@ export { listGeminiModels, GEMINI_DEFAULT_MODEL } from './gemini';
 export { listAnthropicModels } from './anthropic';
 export { listOpenAiModels } from './openai';
 export { QuotaError, cooldownRemaining, lastQuotaError, clearCooldown } from './limiter';
+export { capabilitiesFor, type Capabilities } from './capabilities';
 export { BUDGET };
 
 /**
@@ -35,26 +44,18 @@ export async function verifyKey(config: AiConfig, signal?: AbortSignal): Promise
 /** Every provider call goes through the limiter, so free-tier keys are not hammered. */
 function run(config: AiConfig, call: Call, signal?: AbortSignal): Promise<CallResult> {
   return schedule(() => {
-    // Most OpenAI-compatible endpoints have no search tool, so the request goes
-    // out without one. xAI is the exception — its Live Search reads X and the web.
-    const searchable = config.kind !== 'openai' || config.vendor === 'xai';
-    const request = searchable ? call : { ...call, search: undefined };
+    const caps = capabilitiesFor(config);
+    const search = caps.search ? call.search : undefined;
+    const request: Call = {
+      ...call,
+      search,
+      // Structured output and web search cannot be combined on some providers.
+      responseFormat: search && caps.jsonConflictsWithSearch ? undefined : call.responseFormat,
+    };
     if (config.kind === 'gemini') return runGemini(config, request, signal);
     if (config.kind === 'openai') return runOpenAiCompatible(config, request, signal);
     return runAnthropic(config, request, signal);
   });
-}
-
-/** Models are asked for bare JSON, but tolerate fences and leading prose. */
-function parseJson<T>(raw: string): T | null {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const start = raw.search(/[[{]/);
-  const candidate = fenced ? fenced[1] : start >= 0 ? raw.slice(start) : raw;
-  try {
-    return JSON.parse(candidate) as T;
-  } catch {
-    return null;
-  }
 }
 
 function languageInstruction(languageCode: string) {
@@ -72,17 +73,29 @@ function languageInstruction(languageCode: string) {
 const BUDGET = {
   /** Characters of article body sent to the model. ~1k tokens. */
   body: 4000,
+  /** Fact checks reason over claims, not prose, so they need less of the body. */
+  factCheckBody: 2500,
   /** Sibling headlines included as coverage context. */
   related: 4,
   /** Turns of follow-up history replayed. Older turns fall off. */
   history: 6,
-  maxTokens: { summary: 700, factCheck: 1500, social: 1500, followUp: 700, translate: 1200 },
+  maxTokens: { summary: 900, factCheck: 2600, social: 1800, followUp: 700, translate: 1200 },
   searchUses: { factCheck: 3, social: 4, followUp: 2 },
   /** Headlines translated per feed load. */
   translate: 15,
 };
 
-function contextBlock(article: ArticleContext) {
+/**
+ * Non-Latin scripts cost roughly 1.6x the output tokens for the same content on
+ * these vendors' tokenizers, and a JSON object that cannot close is unreadable.
+ * This is an estimate — worth tuning against real usage figures.
+ */
+export function tokenBudget(task: keyof typeof BUDGET.maxTokens, languageCode: string): number {
+  const base = BUDGET.maxTokens[task];
+  return getLanguage(languageCode).script === 'non-latin' ? Math.round(base * 1.6) : base;
+}
+
+function contextBlock(article: ArticleContext, bodyChars: number = BUDGET.body) {
   return [
     `HEADLINE: ${article.title}`,
     `PUBLISHER: ${article.source}`,
@@ -95,7 +108,7 @@ function contextBlock(article: ArticleContext) {
           .join('\n')}`
       : '',
     article.body
-      ? `ARTICLE TEXT:\n${article.body.slice(0, BUDGET.body)}`
+      ? `ARTICLE TEXT:\n${article.body.slice(0, bodyChars)}`
       : 'ARTICLE TEXT: (could not be retrieved — reason from the headline and the coverage list, and say so.)',
   ]
     .filter(Boolean)
@@ -132,12 +145,13 @@ export async function summarizeArticle(
       system: `${SUMMARY_SYSTEM}\n\n${languageInstruction(languageCode)}`,
       messages: [{ role: 'user', content: contextBlock(article) }],
       effort: 'low',
-      maxTokens: BUDGET.maxTokens.summary,
+      maxTokens: tokenBudget('summary', languageCode),
+      responseFormat: 'json',
     },
     signal,
   );
 
-  const parsed = parseJson<Omit<Summary, 'readingTimeSec'>>(text);
+  const parsed = parseJsonLoose<Omit<Summary, 'readingTimeSec'>>(text);
   if (!parsed?.tldr) {
     return {
       headline: article.title,
@@ -176,43 +190,82 @@ Reply with ONLY a JSON object:
  "claims": [{"claim": string, "assessment": "supported"|"disputed"|"unverified", "note": string}],
  "sources": [{"title": string, "url": string}]}`;
 
+const COVERAGE_CHECK_SYSTEM = `You are checking a news item WITHOUT web access. You cannot search, and you must not pretend otherwise.
+
+What you can do:
+- Read the article text for internal consistency: do its own numbers, dates, names and quotes agree with each other?
+- Compare it against the headlines other outlets published about the same story, which are supplied below.
+- Say where those headlines agree with the article, where they differ in substance, and where they are simply too thin to tell.
+
+Rules:
+- Never claim something is corroborated. You have consulted no sources. The most you can say is that other coverage is consistent with it.
+- If the supplied headlines are too thin to say anything useful, answer "unverifiable". That is the expected answer here, not a failure.
+- Return an empty sources array. You have no sources.
+
+Reply with ONLY a JSON object:
+{"verdict": "supported" | "mixed" | "unsupported" | "unverifiable",
+ "confidence": "low" | "medium" | "high",
+ "summary": string (2-3 sentences on how the story holds together),
+ "claims": [{"claim": string, "assessment": "supported"|"disputed"|"unverified", "note": string}],
+ "sources": []}`;
+
+export type FactCheckMode = 'web' | 'coverage';
+
+/**
+ * `web` searches for corroboration and cites what it found. `coverage` is the
+ * honest fallback for a provider that cannot search: it compares the article
+ * against the sibling headlines and says plainly that it consulted nothing.
+ */
 export async function factCheckArticle(
   config: AiConfig,
   article: ArticleContext,
   languageCode: string,
-  signal?: AbortSignal,
+  opts: { mode?: FactCheckMode; signal?: AbortSignal } = {},
 ): Promise<FactCheck> {
-  const { text, sources } = await run(
+  const mode: FactCheckMode = opts.mode ?? 'web';
+  const caps = capabilitiesFor(config);
+
+  if (mode === 'web' && !caps.search) {
+    throw new SearchUnavailableError(getProvider(config.vendor ?? '').label, caps.searchReason);
+  }
+
+  const grounding: FactCheck['grounding'] = mode === 'web' ? 'web' : 'coverage';
+  const system = mode === 'web' ? FACT_CHECK_SYSTEM : COVERAGE_CHECK_SYSTEM;
+
+  const { text, sources, truncated } = await run(
     config,
     {
-      system: `${FACT_CHECK_SYSTEM}\n\nThe "summary", "claim" and "note" fields must be written in the reader's language. ${languageInstruction(
+      system: `${system}\n\nThe "summary", "claim" and "note" fields must be written in the reader's language. ${languageInstruction(
         languageCode,
       )} Keep source titles in their original language.`,
-      messages: [{ role: 'user', content: contextBlock(article) }],
-      // 'medium' rather than 'high': the extra effort roughly triples cost for a
-      // marginal gain on a task that is mostly retrieval.
+      messages: [{ role: 'user', content: contextBlock(article, BUDGET.factCheckBody) }],
       effort: 'medium',
-      maxTokens: BUDGET.maxTokens.factCheck,
-      search: { maxUses: BUDGET.searchUses.factCheck },
+      maxTokens: tokenBudget('factCheck', languageCode),
+      responseFormat: 'json',
+      ...(mode === 'web' ? { search: { maxUses: BUDGET.searchUses.factCheck } } : {}),
     },
-    signal,
+    opts.signal,
   );
 
-  const parsed = parseJson<FactCheck>(text);
-  if (!parsed?.verdict) {
-    return {
-      verdict: 'unverifiable',
-      confidence: 'low',
-      summary: text || 'The fact check could not be completed.',
-      claims: [],
-      sources,
-    };
+  const parsed = parseJson<unknown>(text);
+  if (!parsed.ok) {
+    const problem =
+      parsed.reason === 'no-json'
+        ? 'the model answered in prose instead of JSON'
+        : parsed.reason === 'truncated'
+          ? 'the reply was cut off before it finished'
+          : 'the JSON was malformed';
+    throw new FactCheckParseError(problem, text);
   }
-  return {
-    ...parsed,
-    claims: parsed.claims ?? [],
-    sources: parsed.sources?.length ? parsed.sources : sources,
-  };
+
+  const coerced = coerceFactCheck(parsed.value, {
+    grounding,
+    status: parsed.repaired || truncated ? 'partial' : 'ok',
+    fallbackSources: sources,
+  });
+  if (!coerced.ok) throw new FactCheckParseError(coerced.problem, text);
+
+  return coerced.value;
 }
 
 // ------------------------------------------------------------- social pulse
@@ -263,13 +316,14 @@ export async function socialPulse(
       )} Keep handles, URLs and hashtags as they are.`,
       messages: [{ role: 'user', content: prompt }],
       effort: 'medium',
-      maxTokens: BUDGET.maxTokens.social,
+      maxTokens: tokenBudget('social', languageCode),
+      responseFormat: 'json',
       search: { domains: SOCIAL_DOMAINS, maxUses: BUDGET.searchUses.social },
     },
     signal,
   );
 
-  const parsed = parseJson<SocialPulse>(text);
+  const parsed = parseJsonLoose<SocialPulse>(text);
   if (!parsed?.summary) {
     return {
       summary: text || 'Could not read the social conversation for this story.',
@@ -344,6 +398,6 @@ export async function translateHeadlines(
     },
     signal,
   );
-  const parsed = parseJson<string[]>(text);
+  const parsed = parseJsonLoose<string[]>(text, 'array');
   return Array.isArray(parsed) && parsed.length === headlines.length ? parsed : headlines;
 }

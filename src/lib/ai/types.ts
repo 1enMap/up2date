@@ -28,6 +28,28 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
 export type Effort = 'low' | 'medium' | 'high';
 
+/** Raised instead of inventing a verdict the provider could not actually reach. */
+export class SearchUnavailableError extends Error {
+  constructor(
+    readonly providerLabel: string,
+    readonly reason: string,
+  ) {
+    super(reason);
+    this.name = 'SearchUnavailableError';
+  }
+}
+
+/** Raised when the reply could not be read as a fact check, carrying the raw text. */
+export class FactCheckParseError extends Error {
+  constructor(
+    readonly problem: string,
+    readonly raw: string,
+  ) {
+    super(`Could not read the fact check — ${problem}.`);
+    this.name = 'FactCheckParseError';
+  }
+}
+
 /** One provider-agnostic request. Each provider maps this onto its own API. */
 export type Call = {
   system: string;
@@ -36,12 +58,16 @@ export type Call = {
   maxTokens: number;
   /** Ask the provider to search the web; `domains` narrows it where supported. */
   search?: { domains?: string[]; maxUses?: number };
+  /** Ask the provider to emit JSON, where it supports being told so. */
+  responseFormat?: 'json';
 };
 
 export type CallResult = {
   text: string;
   /** Pages the model actually consulted, when the provider reports them. */
   sources: { title: string; url: string }[];
+  /** The reply hit the output cap, so the payload is probably cut off. */
+  truncated?: boolean;
 };
 
 export type ArticleContext = {
@@ -66,6 +92,10 @@ export type Summary = {
 export type FactCheck = {
   verdict: 'supported' | 'mixed' | 'unsupported' | 'unverifiable';
   confidence: 'low' | 'medium' | 'high';
+  /** 'web' = sources were searched. 'coverage' = compared against sibling headlines only. */
+  grounding: 'web' | 'coverage';
+  /** 'partial' when the reply was truncated and had to be repaired. */
+  status: 'ok' | 'partial';
   summary: string;
   claims: { claim: string; assessment: 'supported' | 'disputed' | 'unverified'; note: string }[];
   sources: { title: string; url: string }[];
