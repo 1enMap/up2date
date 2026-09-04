@@ -76,7 +76,18 @@ export default function AiProviderScreen() {
     }
   };
 
+  /** localhost on a phone is the phone, which is never where the model runs. */
+  const localhostTrap =
+    /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(baseUrl.trim() || preset.baseUrl);
+
   const save = async () => {
+    if (localhostTrap) {
+      setStatus({
+        tone: 'bad',
+        text: 'Change localhost to the LAN address of the machine running the server (e.g. http://192.168.1.5:11434/v1). On the phone, localhost is the phone.',
+      });
+      return;
+    }
     if (keyDraft.trim()) await saveApiKey(providerId, keyDraft.trim());
     store.set('providerId', providerId);
     store.set('aiBaseUrl', baseUrl.trim());
@@ -226,6 +237,13 @@ export default function AiProviderScreen() {
             </>
           ) : null}
         </Card>
+
+        {localhostTrap ? (
+          <Text style={{ color: t.warn, fontSize: 12, lineHeight: 18 }}>
+            This base URL points at the phone itself. Replace localhost with the machine's LAN address, and make
+            sure the server listens on it — for Ollama, start it with OLLAMA_HOST=0.0.0.0.
+          </Text>
+        ) : null}
 
         <Button label="Save" icon="checkmark" onPress={save} />
 

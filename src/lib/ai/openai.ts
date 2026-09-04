@@ -8,7 +8,17 @@ import { AiNotConfiguredError, type AiConfig, type Call, type CallResult } from 
  */
 
 type ChatResponse = {
-  choices?: { message?: { content?: string }; finish_reason?: string }[];
+  choices?: {
+    message?: {
+      content?: string | null;
+      /** Reasoning models put their chain here and may leave `content` empty. */
+      reasoning_content?: string | null;
+      reasoning?: string | null;
+    };
+    finish_reason?: string;
+  }[];
+  /** xAI Live Search returns the pages it consulted. */
+  citations?: string[];
   error?: { message?: string; type?: string; code?: string | number };
 };
 
@@ -39,6 +49,41 @@ function quotaFrom(res: Response, body: ChatResponse, model: string): QuotaError
   );
 }
 
+/** xAI is the one OpenAI-compatible vendor that can search X and the web. */
+function liveSearchFor(config: AiConfig, call: Call) {
+  if (config.vendor !== 'xai' || !call.search) return undefined;
+  return {
+    mode: 'auto',
+    return_citations: true,
+    max_search_results: call.search.maxUses ?? 4,
+    sources: [{ type: 'x' }, { type: 'web' }],
+  };
+}
+
+async function post(config: AiConfig, payload: Record<string, unknown>, signal?: AbortSignal) {
+  try {
+    return await fetch(endpoint(config, '/chat/completions'), {
+      method: 'POST',
+      signal,
+      headers: headers(config),
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    // Android blocks plain HTTP unless the build opts in, and a phone's own
+    // localhost is not the machine running Ollama.
+    if (/CLEARTEXT|cleartext/i.test(message)) {
+      throw new Error(
+        'Android blocked this plain-HTTP request. Use an https endpoint, or a build with cleartext enabled, and point the base URL at the machine\'s LAN address rather than localhost.',
+      );
+    }
+    if (/Network request failed|Failed to fetch|ECONNREFUSED/i.test(message)) {
+      throw new Error(`Could not reach ${config.baseUrl}. Check the phone is on the same network and the server is running.`);
+    }
+    throw e;
+  }
+}
+
 export async function runOpenAiCompatible(
   config: AiConfig,
   call: Call,
@@ -47,20 +92,24 @@ export async function runOpenAiCompatible(
   const model = config.model;
   if (!model) throw new AiNotConfiguredError();
 
-  const res = await fetch(endpoint(config, '/chat/completions'), {
-    method: 'POST',
-    signal,
-    headers: headers(config),
-    body: JSON.stringify({
-      model,
-      max_tokens: call.maxTokens,
-      temperature: 0.3,
-      messages: [
-        { role: 'system', content: call.system },
-        ...call.messages.map((t) => ({ role: t.role, content: t.content })),
-      ],
-    }),
-  });
+  const base: Record<string, unknown> = {
+    model,
+    max_tokens: call.maxTokens,
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: call.system },
+      ...call.messages.map((t) => ({ role: t.role, content: t.content })),
+    ],
+  };
+
+  const search = liveSearchFor(config, call);
+  let res = await post(config, search ? { ...base, search_parameters: search } : base, signal);
+
+  // A provider that does not know `search_parameters` rejects the whole request;
+  // losing search beats losing the answer.
+  if (!res.ok && search && (res.status === 400 || res.status === 422)) {
+    res = await post(config, base, signal);
+  }
 
   const body = (await res.json().catch(() => ({}))) as ChatResponse;
 
@@ -72,11 +121,25 @@ export async function runOpenAiCompatible(
     throw new Error(body.error?.message ?? `Request failed (${res.status}). Check the base URL and model id.`);
   }
 
-  const text = (body.choices?.[0]?.message?.content ?? '').trim();
-  if (!text) throw new Error('The model returned an empty response.');
+  const choice = body.choices?.[0];
+  const message = choice?.message;
+  // Reasoning models sometimes answer in `reasoning_content` and leave `content` empty.
+  const text = (message?.content || message?.reasoning_content || message?.reasoning || '').trim();
 
-  // These endpoints have no server-side search tool, so nothing to cite.
-  return { text, sources: [] };
+  if (!text) {
+    if (choice?.finish_reason === 'length') {
+      throw new Error(
+        `${model} used its whole output budget before answering — typical of reasoning models. Pick a non-reasoning model, or raise the budget in lib/ai BUDGET.`,
+      );
+    }
+    if (choice?.finish_reason === 'content_filter') {
+      throw new Error(`${model} declined to answer this one.`);
+    }
+    throw new Error(`${model} returned an empty response (finish_reason: ${choice?.finish_reason ?? 'none'}).`);
+  }
+
+  const sources = (body.citations ?? []).map((url) => ({ title: url, url }));
+  return { text, sources };
 }
 
 /** `GET /models` — used to check a key and to populate the model picker. */

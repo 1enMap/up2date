@@ -32,7 +32,13 @@ function build(providerId: string, overrideBaseUrl: string, overrideModel: strin
 
   return {
     preset,
-    config: { kind: preset.kind, apiKey: apiKey ?? undefined, baseUrl: baseUrl || undefined, model: model || undefined },
+    config: {
+      kind: preset.kind,
+      vendor: preset.id,
+      apiKey: apiKey ?? undefined,
+      baseUrl: baseUrl || undefined,
+      model: model || undefined,
+    },
     ready,
   };
 }

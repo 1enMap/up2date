@@ -35,9 +35,10 @@ export async function verifyKey(config: AiConfig, signal?: AbortSignal): Promise
 /** Every provider call goes through the limiter, so free-tier keys are not hammered. */
 function run(config: AiConfig, call: Call, signal?: AbortSignal): Promise<CallResult> {
   return schedule(() => {
-    // Only Anthropic and Gemini have a server-side search tool; the rest answer
-    // from what the model already knows, so the request goes out without one.
-    const request = config.kind === 'openai' ? { ...call, search: undefined } : call;
+    // Most OpenAI-compatible endpoints have no search tool, so the request goes
+    // out without one. xAI is the exception — its Live Search reads X and the web.
+    const searchable = config.kind !== 'openai' || config.vendor === 'xai';
+    const request = searchable ? call : { ...call, search: undefined };
     if (config.kind === 'gemini') return runGemini(config, request, signal);
     if (config.kind === 'openai') return runOpenAiCompatible(config, request, signal);
     return runAnthropic(config, request, signal);

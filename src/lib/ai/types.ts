@@ -13,6 +13,8 @@ export type AiConfig = {
   baseUrl?: string;
   /** Model id. Required for the OpenAI-compatible adapter. */
   model?: string;
+  /** Provider id, so an adapter can opt into vendor extras (xAI Live Search). */
+  vendor?: string;
 };
 
 export class AiNotConfiguredError extends Error {

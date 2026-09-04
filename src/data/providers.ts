@@ -132,8 +132,9 @@ export const PROVIDERS: ProviderPreset[] = [
     keyHint: 'xai-…',
     console: 'console.x.ai',
     consoleUrl: 'https://console.x.ai',
-    blurb: 'Grok models.',
-    search: false,
+    blurb: 'Grok models. Can search X itself.',
+    search: true,
+    note: 'Uses xAI Live Search, which reads X posts as well as the web — the one provider here that sees X directly. Each search result is billed on top of tokens. If your account has Live Search disabled the request still succeeds, just without search.',
   },
   {
     id: 'together',
@@ -159,7 +160,7 @@ export const PROVIDERS: ProviderPreset[] = [
     blurb: 'Runs on your own machine. No key, no cost.',
     search: false,
     free: true,
-    note: 'The phone must reach the machine running Ollama — use its LAN address (e.g. http://192.168.1.5:11434/v1), not localhost.',
+    note: 'localhost means the phone itself, so it will not work — use the LAN address of the machine running Ollama (e.g. http://192.168.1.5:11434/v1), start it with OLLAMA_HOST=0.0.0.0, and keep both on the same Wi-Fi. Android also blocks plain HTTP unless the build allows it.',
     editableBaseUrl: true,
   },
   {
