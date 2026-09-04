@@ -5,10 +5,12 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button, Card, Divider, SectionTitle } from '@/components/ui';
+import { UpdatesCard } from '@/components/UpdatesCard';
 import { getCountry } from '@/data/countries';
 import { getLanguage } from '@/data/languages';
 import { TOPICS } from '@/data/topics';
 import { GEMINI_DEFAULT_MODEL, cooldownRemaining, listGeminiModels, type Provider } from '@/lib/ai';
+import { appVersion } from '@/lib/updates';
 import { saveApiKey, useApiKey } from '@/state/apiKey';
 import { builtInProxy } from '@/state/useAiConfig';
 import { useStore } from '@/state/store';
@@ -392,6 +394,11 @@ export default function SettingsScreen() {
       </View>
 
       <View>
+        <SectionTitle>Updates</SectionTitle>
+        <UpdatesCard />
+      </View>
+
+      <View>
         <SectionTitle>About</SectionTitle>
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
@@ -402,7 +409,7 @@ export default function SettingsScreen() {
             />
             <View>
               <Text style={{ color: t.text, fontSize: 15, fontWeight: '700' }}>Up2Date</Text>
-              <Text style={{ color: t.textFaint, fontSize: 12 }}>Version 1.0.0</Text>
+              <Text style={{ color: t.textFaint, fontSize: 12 }}>Version {appVersion}</Text>
             </View>
           </View>
           <Text style={{ color: t.textDim, fontSize: 13, lineHeight: 20, marginTop: space(3) }}>

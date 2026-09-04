@@ -2,7 +2,7 @@
   "expo": {
     "name": "Up2Date",
     "slug": "Up2Date",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "up2date",
@@ -24,6 +24,10 @@
         "backgroundImage": "./assets/android-icon-background.png"
       },
       "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -70,6 +74,14 @@
       },
       "router": {}
     },
-    "owner": "zenmap"
+    "owner": "zenmap",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/dd1f4ae3-c359-433f-85b7-456030836c6c",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }
